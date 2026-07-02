@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>病理學期末 A 型題刷題系統</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#home" aria-label="回到首頁">
+          <span class="brand-mark">P</span>
+          <span>
+            <strong>病理學刷題</strong>
+            <small>A 型題期末復習</small>
+          </span>
+        </a>
+
+        <nav class="nav-block" aria-label="主要功能">
+          <a href="#home" data-nav="home">首頁</a>
+          <a href="#exam" data-nav="exam">模擬考試</a>
+          <a href="#wrong" data-nav="wrong">錯題本</a>
+          <a href="#search" data-nav="search">搜索題目</a>
+        </nav>
+
+        <div class="nav-title">考試章節</div>
+        <nav id="chapterNav" class="chapter-nav" aria-label="章節導航"></nav>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <div class="eyebrow">Local question bank</div>
+            <h1 id="pageTitle">病理學期末 A 型題刷題系統</h1>
+          </div>
+          <form id="quickSearch" class="quick-search" role="search">
+            <label class="sr-only" for="quickSearchInput">搜索題目</label>
+            <input id="quickSearchInput" type="search" placeholder="搜索：乾酪樣壞死、假小葉、新月體" />
+            <button type="submit">搜索</button>
+          </form>
+        </header>
+
+        <section id="app" class="content" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="questions.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
