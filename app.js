@@ -104,21 +104,30 @@
       currentExam = createExam();
     }
 
-    renderNav(route);
+    const applyRender = () => {
+      renderNav(route);
 
-    if (route.view === "chapter") {
-      renderChapter(route.param);
-    } else if (route.view === "exam") {
-      renderExam();
-    } else if (route.view === "wrong") {
-      renderWrongBook();
-    } else if (route.view === "search") {
-      renderSearch();
+      if (route.view === "chapter") {
+        renderChapter(route.param);
+      } else if (route.view === "exam") {
+        renderExam();
+      } else if (route.view === "wrong") {
+        renderWrongBook();
+      } else if (route.view === "search") {
+        renderSearch();
+      } else {
+        renderHome();
+      }
+
+      lastRouteView = route.view;
+    };
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduceMotion && document.startViewTransition) {
+      document.startViewTransition(applyRender);
     } else {
-      renderHome();
+      applyRender();
     }
-
-    lastRouteView = route.view;
   }
 
   function getChapterStats(chapterId) {
@@ -276,7 +285,7 @@
         : renderPracticeActions(q, index, total, isWrongMarked);
 
     return `
-      <article class="question-card" id="${escapeHtml(q.id)}">
+      <article class="question-card" id="${escapeHtml(q.id)}" style="--card-index:${index % 8}">
         <div class="question-meta">
           <span class="tag">${index + 1}/${total}</span>
           <span class="tag">${escapeHtml(q.chapter)}</span>
@@ -306,7 +315,7 @@
     const checked = config.selected === label ? "checked" : "";
     const disabled = config.submitted ? "disabled" : "";
     return `
-      <label class="${classes.join(" ")}">
+      <label class="${classes.join(" ")}" style="--option-index:${"ABCDE".indexOf(label)}">
         <input type="radio" name="${config.mode}-${escapeHtml(q.id)}" value="${label}" data-context="${config.mode}" data-question-id="${escapeHtml(q.id)}" ${checked} ${disabled} />
         <span><strong>${label}.</strong> ${escapeHtml(optionText)}</span>
       </label>
