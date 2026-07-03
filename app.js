@@ -1,5 +1,6 @@
 (() => {
-  const DATA = window.PATHOLOGY_QUESTIONS;
+  const dataReady = window.PATHOLOGY_QUESTIONS_READY || Promise.resolve(window.PATHOLOGY_QUESTIONS);
+  dataReady.then((DATA) => {
   const STORAGE_KEY = "pathology-a-type-state-v1";
 
   if (!DATA || !Array.isArray(DATA.questions)) {
@@ -156,6 +157,8 @@
             <a class="button primary" href="#exam">開始 150 題模擬考</a>
             <a class="button" href="#wrong">查看錯題本</a>
             <a class="button" href="#search">搜索關鍵詞</a>
+            <button type="button" data-action="reset-all-progress">重置全部進度</button>
+            <button type="button" class="danger" data-action="clear-wrong-book">清空錯題本</button>
           </div>
         </div>
         <div class="panel">
@@ -210,6 +213,7 @@
         <div class="tools">
           <a class="button" href="#home">返回首頁</a>
           <a class="button" href="#search">搜索題目</a>
+          <button type="button" data-action="reset-chapter" data-chapter-id="${chapter.id}">重置本章</button>
         </div>
       </section>
 
@@ -237,10 +241,16 @@
   function renderQuestionCard(q, config) {
     const { mode, index, total } = config;
     const isExam = mode === "exam";
+    const isWrong = mode === "wrong";
     const submitted = Boolean(config.submitted);
     const practiceRecord = state.practice[q.id];
-    const selected = isExam ? currentExam.answers[q.id] || "" : practiceRecord?.selected || "";
-    const showAnswer = submitted || revealedAnswers.has(q.id) || Boolean(practiceRecord);
+    const wrongEntry = config.wrongEntry || state.wrongBook[q.id];
+    const selected = isExam
+      ? currentExam.answers[q.id] || ""
+      : isWrong
+        ? wrongEntry?.retrySelected || ""
+        : practiceRecord?.selected || "";
+    const showAnswer = submitted || revealedAnswers.has(q.id) || (isWrong ? Boolean(wrongEntry?.retryChecked) : Boolean(practiceRecord));
     const isWrongMarked = Boolean(state.wrongBook[q.id]);
     const correct = selected && selected === q.answer;
 
@@ -261,7 +271,13 @@
         </div>
         ${renderFeedback(q, { selected, showAnswer, isExam, submitted, practiceRecord, correct })}
         ${showAnswer ? renderAnswerBox(q) : ""}
-        ${isExam ? renderExamCardActions(q, submitted, isWrongMarked) : renderPracticeActions(q, index, total, isWrongMarked)}
+        ${
+          isExam
+            ? renderExamCardActions(q, submitted, isWrongMarked)
+            : isWrong
+              ? renderWrongPracticeActions(q, isWrongMarked)
+              : renderPracticeActions(q, index, total, isWrongMarked)
+        }
       </article>
     `;
   }
@@ -269,6 +285,7 @@
   function renderOption(q, label, config) {
     const optionText = q.options[label] || "";
     const classes = ["option-row"];
+    if (config.selected === label) classes.push("selected");
     if (config.showAnswer && label === q.answer) classes.push("correct");
     if (config.showAnswer && config.selected === label && label !== q.answer) classes.push("incorrect");
     const checked = config.selected === label ? "checked" : "";
@@ -318,6 +335,16 @@
     return `
       <div class="card-actions">
         <button data-action="toggle-wrong" data-question-id="${escapeHtml(q.id)}">${isWrongMarked ? "移出錯題本" : "標記錯題"}</button>
+      </div>
+    `;
+  }
+
+  function renderWrongPracticeActions(q, isWrongMarked) {
+    return `
+      <div class="card-actions">
+        <button class="primary" data-action="check-wrong-answer" data-question-id="${escapeHtml(q.id)}">檢查錯題</button>
+        <button data-action="reveal-answer" data-question-id="${escapeHtml(q.id)}">顯示答案</button>
+        <button class="danger" data-action="remove-wrong" data-question-id="${escapeHtml(q.id)}">${isWrongMarked ? "移出錯題本" : "已移出"}</button>
       </div>
     `;
   }
@@ -439,7 +466,7 @@
       app.innerHTML = `
         <section class="empty-state">
           <h2>錯題本目前是空的</h2>
-          <p>分章刷題或模擬考答錯後，題目會自動加入這裡；你也可以手動標記題目。</p>
+          <p>分章刷題或模擬考答錯後，題目會自動加入這裡。答對錯題後會自動移出。</p>
         </section>
       `;
       return;
@@ -449,11 +476,14 @@
       <section class="chapter-head">
         <div>
           <h2>錯題本</h2>
-          <p class="muted">共 ${entries.length} 題，保存在本機瀏覽器 localStorage。</p>
+          <p class="muted">共 ${entries.length} 題。直接在這裡重新作答：答錯會繼續保留，答對會自動移出。</p>
+        </div>
+        <div class="tools">
+          <button class="danger" data-action="clear-wrong-book">清空錯題本</button>
         </div>
       </section>
       <section class="wrong-grid">
-        ${entries.map(renderWrongCard).join("")}
+        ${entries.map((entry, index) => renderQuestionCard(entry.question, { mode: "wrong", index, total: entries.length, wrongEntry: entry })).join("")}
       </section>
     `;
   }
@@ -620,11 +650,76 @@
 
   function addWrong(questionId, wrongAnswer, source) {
     state.wrongBook[questionId] = {
+      ...state.wrongBook[questionId],
       questionId,
       wrongAnswer: wrongAnswer || "手動標記",
       source,
       addedAt: new Date().toISOString(),
+      retrySelected: "",
+      retryChecked: false,
     };
+  }
+
+  function resetChapter(chapterId) {
+    const chapter = chapters.find((item) => item.id === chapterId);
+    if (!chapter) return;
+    if (!window.confirm(`確定重置「${chapter.title}」的做題記錄嗎？錯題本不會被清空。`)) return;
+    chapter.questions.forEach((question) => {
+      delete state.practice[question.id];
+      revealedAnswers.delete(question.id);
+    });
+    saveState();
+    render();
+    showToast("本章進度已重置。");
+  }
+
+  function resetAllProgress() {
+    if (!window.confirm("確定重置全部分章做題記錄和最近一次模擬考成績嗎？錯題本不會被清空。")) return;
+    state.practice = {};
+    state.lastExam = null;
+    currentExam = null;
+    revealedAnswers.clear();
+    saveState();
+    render();
+    showToast("全部進度已重置。");
+  }
+
+  function clearWrongBook() {
+    if (!window.confirm("確定清空錯題本嗎？這個操作不能撤回。")) return;
+    state.wrongBook = {};
+    saveState();
+    render();
+    showToast("錯題本已清空。");
+  }
+
+  function checkWrongAnswer(questionId) {
+    const question = questionById.get(questionId);
+    const selected = getSelectedAnswer("wrong", questionId);
+    if (!selected) {
+      showToast("請先選擇一個答案。");
+      return;
+    }
+    if (selected === question.answer) {
+      delete state.wrongBook[questionId];
+      revealedAnswers.delete(questionId);
+      saveState();
+      render();
+      showToast("這題答對了，已移出錯題本。");
+      return;
+    }
+    state.wrongBook[questionId] = {
+      ...state.wrongBook[questionId],
+      questionId,
+      wrongAnswer: selected,
+      retrySelected: selected,
+      retryChecked: true,
+      attempts: (state.wrongBook[questionId]?.attempts || 0) + 1,
+      lastTriedAt: new Date().toISOString(),
+    };
+    revealedAnswers.add(questionId);
+    saveState();
+    render();
+    showToast("仍然答錯，這題會繼續留在錯題本。");
   }
 
   function toggleWrong(questionId) {
@@ -664,6 +759,7 @@
     if (action === "prev-question") moveQuestion(-1);
     if (action === "next-question") moveQuestion(1);
     if (action === "check-answer") checkPracticeAnswer(target.dataset.questionId);
+    if (action === "check-wrong-answer") checkWrongAnswer(target.dataset.questionId);
     if (action === "reveal-answer") {
       revealedAnswers.add(target.dataset.questionId);
       render();
@@ -684,6 +780,9 @@
       showToast("已重新生成試卷。");
     }
     if (action === "submit-exam") submitExam();
+    if (action === "reset-chapter") resetChapter(target.dataset.chapterId);
+    if (action === "reset-all-progress") resetAllProgress();
+    if (action === "clear-wrong-book") clearWrongBook();
     if (action === "clear-search") {
       state.searchQuery = "";
       render();
@@ -691,8 +790,20 @@
   }
 
   function handleChange(event) {
-    const input = event.target.closest('input[type="radio"][data-context="exam"]');
-    if (!input || !currentExam || currentExam.submitted) return;
+    const input = event.target.closest('input[type="radio"]');
+    if (!input) return;
+    if (input.dataset.context === "wrong") {
+      const entry = state.wrongBook[input.dataset.questionId];
+      if (entry) {
+        entry.retrySelected = input.value;
+        entry.retryChecked = false;
+        revealedAnswers.delete(input.dataset.questionId);
+        saveState();
+        render();
+      }
+      return;
+    }
+    if (input.dataset.context !== "exam" || !currentExam || currentExam.submitted) return;
     currentExam.answers[input.dataset.questionId] = input.value;
     const answeredLabel = document.getElementById("examAnswered");
     if (answeredLabel) answeredLabel.textContent = Object.keys(currentExam.answers).length;
@@ -720,4 +831,7 @@
 
   saveState();
   render();
+  }).catch(() => {
+    document.getElementById("app").innerHTML = '<div class="empty-state">題庫載入失敗，請重新整理頁面。</div>';
+  });
 })();
