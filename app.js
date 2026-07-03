@@ -98,13 +98,15 @@
     document.querySelectorAll(`[data-nav="${activeKey}"]`).forEach((link) => link.classList.add("active"));
   }
 
-  function render() {
+  function render(options = {}) {
     const route = parseRoute();
     if (route.view === "exam" && lastRouteView !== "exam") {
       currentExam = createExam();
     }
 
+    const useTransition = Boolean(options.transition);
     const applyRender = () => {
+      app.dataset.motion = useTransition ? "switch" : "none";
       renderNav(route);
 
       if (route.view === "chapter") {
@@ -122,12 +124,7 @@
       lastRouteView = route.view;
     };
 
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!reduceMotion && document.startViewTransition) {
-      document.startViewTransition(applyRender);
-    } else {
-      applyRender();
-    }
+    applyRender();
   }
 
   function getChapterStats(chapterId) {
@@ -643,7 +640,7 @@
 
   function jumpQuestion(chapterId, index) {
     chapterCursor[chapterId] = Number(index);
-    render();
+    render({ transition: true });
   }
 
   function moveQuestion(direction) {
@@ -653,7 +650,7 @@
     if (!chapter) return;
     const current = chapterCursor[chapter.id] || 0;
     chapterCursor[chapter.id] = Math.max(0, Math.min(chapter.questions.length - 1, current + direction));
-    render();
+    render({ transition: true });
   }
 
   function getSelectedAnswer(context, questionId) {
@@ -858,13 +855,13 @@
     event.preventDefault();
     state.searchQuery = quickSearchInput.value.trim();
     location.hash = "search";
-    render();
+    render({ transition: true });
   });
 
   app.addEventListener("click", handleClick);
   app.addEventListener("change", handleChange);
   app.addEventListener("submit", handleSubmit);
-  window.addEventListener("hashchange", render);
+  window.addEventListener("hashchange", () => render({ transition: true }));
 
   saveState();
   render();
