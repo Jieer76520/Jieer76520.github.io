@@ -28,6 +28,7 @@
   let lastRouteView = "";
   const chapterCursor = {};
   const revealedAnswers = new Set();
+  const wrongDrafts = {};
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (char) => {
@@ -136,6 +137,19 @@
   function formatAnswer(q, answer) {
     if (!answer) return "未作答";
     return `${answer}. ${q.options[answer] || ""}`;
+  }
+
+  function getRevealKey(mode, questionId) {
+    return mode === "wrong" ? `wrong:${questionId}` : questionId;
+  }
+
+  function displayExplanation(q) {
+    return String(q.explanation || "")
+      .replace(/^白皮答案[為为]\s*([A-E])（([^）]+)）。\s*/, "正確答案為 $1（$2）。")
+      .replace(/^考試指南答案[為为]\s*([A-E])（([^）]+)）。\s*/, "正確答案為 $1（$2）。")
+      .replace(/^答案[為为]\s*([A-E])（([^）]+)）。\s*/, "正確答案為 $1（$2）。")
+      .replace(/(?:來源|sourcePage)[：:][\s\S]*$/i, "")
+      .trim();
   }
 
   function renderHome() {
@@ -248,11 +262,18 @@
     const selected = isExam
       ? currentExam.answers[q.id] || ""
       : isWrong
-        ? wrongEntry?.retrySelected || ""
+        ? wrongDrafts[q.id] || ""
         : practiceRecord?.selected || "";
-    const showAnswer = submitted || revealedAnswers.has(q.id) || (isWrong ? Boolean(wrongEntry?.retryChecked) : Boolean(practiceRecord));
+    const showAnswer = isWrong
+      ? revealedAnswers.has(getRevealKey("wrong", q.id))
+      : submitted || revealedAnswers.has(getRevealKey(mode, q.id)) || Boolean(practiceRecord);
     const isWrongMarked = Boolean(state.wrongBook[q.id]);
     const correct = selected && selected === q.answer;
+    const actions = isExam
+      ? renderExamCardActions(q, submitted, isWrongMarked)
+      : isWrong
+        ? renderWrongPracticeActions(q, isWrongMarked)
+        : renderPracticeActions(q, index, total, isWrongMarked);
 
     return `
       <article class="question-card" id="${escapeHtml(q.id)}">
@@ -269,15 +290,9 @@
             .map((label) => renderOption(q, label, { selected, showAnswer, submitted, mode }))
             .join("")}
         </div>
+        ${actions}
         ${renderFeedback(q, { selected, showAnswer, isExam, submitted, practiceRecord, correct })}
         ${showAnswer ? renderAnswerBox(q) : ""}
-        ${
-          isExam
-            ? renderExamCardActions(q, submitted, isWrongMarked)
-            : isWrong
-              ? renderWrongPracticeActions(q, isWrongMarked)
-              : renderPracticeActions(q, index, total, isWrongMarked)
-        }
       </article>
     `;
   }
@@ -311,8 +326,7 @@
     return `
       <div class="answer-box">
         <div><strong>正確答案：</strong>${escapeHtml(formatAnswer(q, q.answer))}</div>
-        <div><strong>解析：</strong>${escapeHtml(q.explanation)}</div>
-        <div><strong>來源：</strong>${escapeHtml(q.sourcePage)}</div>
+        <div><strong>解析：</strong>${escapeHtml(displayExplanation(q))}</div>
         ${q.corrected ? `<div><strong>修正：</strong>${escapeHtml(q.correctionNote)}</div>` : ""}
       </div>
     `;
@@ -321,11 +335,15 @@
   function renderPracticeActions(q, index, total, isWrongMarked) {
     return `
       <div class="card-actions">
-        <button data-action="prev-question" ${index === 0 ? "disabled" : ""}>上一題</button>
-        <button data-action="next-question" ${index === total - 1 ? "disabled" : ""}>下一題</button>
-        <button class="primary" data-action="check-answer" data-question-id="${escapeHtml(q.id)}">判斷正誤</button>
-        <button data-action="reveal-answer" data-question-id="${escapeHtml(q.id)}">顯示答案</button>
-        <button data-action="toggle-wrong" data-question-id="${escapeHtml(q.id)}">${isWrongMarked ? "移出錯題本" : "加入錯題本"}</button>
+        <div class="primary-actions">
+          <button data-action="prev-question" ${index === 0 ? "disabled" : ""}>上一題</button>
+          <button class="primary" data-action="check-answer" data-question-id="${escapeHtml(q.id)}">判斷正誤</button>
+          <button data-action="next-question" ${index === total - 1 ? "disabled" : ""}>下一題</button>
+        </div>
+        <div class="secondary-actions">
+          <button data-action="reveal-answer" data-context="practice" data-question-id="${escapeHtml(q.id)}">顯示答案</button>
+          <button data-action="toggle-wrong" data-question-id="${escapeHtml(q.id)}">${isWrongMarked ? "移出錯題本" : "加入錯題本"}</button>
+        </div>
       </div>
     `;
   }
@@ -334,7 +352,9 @@
     if (!submitted) return "";
     return `
       <div class="card-actions">
-        <button data-action="toggle-wrong" data-question-id="${escapeHtml(q.id)}">${isWrongMarked ? "移出錯題本" : "標記錯題"}</button>
+        <div class="secondary-actions">
+          <button data-action="toggle-wrong" data-question-id="${escapeHtml(q.id)}">${isWrongMarked ? "移出錯題本" : "標記錯題"}</button>
+        </div>
       </div>
     `;
   }
@@ -342,9 +362,13 @@
   function renderWrongPracticeActions(q, isWrongMarked) {
     return `
       <div class="card-actions">
-        <button class="primary" data-action="check-wrong-answer" data-question-id="${escapeHtml(q.id)}">檢查錯題</button>
-        <button data-action="reveal-answer" data-question-id="${escapeHtml(q.id)}">顯示答案</button>
-        <button class="danger" data-action="remove-wrong" data-question-id="${escapeHtml(q.id)}">${isWrongMarked ? "移出錯題本" : "已移出"}</button>
+        <div class="primary-actions">
+          <button class="primary" data-action="check-wrong-answer" data-question-id="${escapeHtml(q.id)}">判斷正誤</button>
+        </div>
+        <div class="secondary-actions">
+          <button data-action="reveal-answer" data-context="wrong" data-question-id="${escapeHtml(q.id)}">顯示答案</button>
+          <button class="danger" data-action="remove-wrong" data-question-id="${escapeHtml(q.id)}">${isWrongMarked ? "移出錯題本" : "已移出"}</button>
+        </div>
       </div>
     `;
   }
@@ -359,7 +383,7 @@
               (q, index) => `
                 <div class="answer-box">
                   <strong>${index + 1}. ${escapeHtml(q.id)}：</strong>${escapeHtml(formatAnswer(q, q.answer))}
-                  <div>${escapeHtml(q.explanation)}</div>
+                  <div>${escapeHtml(displayExplanation(q))}</div>
                 </div>
               `,
             )
@@ -500,7 +524,7 @@
         <h3>${escapeHtml(q.question)}</h3>
         <p><strong>錯選答案：</strong>${escapeHtml(formatAnswer(q, entry.wrongAnswer))}</p>
         <p><strong>正確答案：</strong>${escapeHtml(formatAnswer(q, q.answer))}</p>
-        <p><strong>解析：</strong>${escapeHtml(q.explanation)}</p>
+        <p><strong>解析：</strong>${escapeHtml(displayExplanation(q))}</p>
         <div class="tools">
           <a class="button" href="#chapter/${q.chapterId}">回到章節</a>
           <button class="danger" data-action="remove-wrong" data-question-id="${escapeHtml(q.id)}">移出錯題本</button>
@@ -545,7 +569,7 @@
         </div>
         <h3>${escapeHtml(q.question)}</h3>
         <p><strong>答案：</strong>${escapeHtml(formatAnswer(q, q.answer))}</p>
-        <p class="muted">${escapeHtml(q.explanation)}</p>
+        <p class="muted">${escapeHtml(displayExplanation(q))}</p>
         <div class="tools">
           <a class="button primary" href="#chapter/${q.chapterId}">去本章刷題</a>
           <button data-action="toggle-wrong" data-question-id="${escapeHtml(q.id)}">${state.wrongBook[q.id] ? "移出錯題本" : "加入錯題本"}</button>
@@ -642,21 +666,21 @@
       answeredAt: new Date().toISOString(),
     };
     if (!correct) addWrong(questionId, selected, "分章刷題");
-    revealedAnswers.add(questionId);
+    revealedAnswers.add(getRevealKey("practice", questionId));
     saveState();
     render();
     showToast(correct ? "回答正確。" : "回答錯誤，已加入錯題本。");
   }
 
   function addWrong(questionId, wrongAnswer, source) {
+    delete wrongDrafts[questionId];
+    revealedAnswers.delete(getRevealKey("wrong", questionId));
     state.wrongBook[questionId] = {
       ...state.wrongBook[questionId],
       questionId,
       wrongAnswer: wrongAnswer || "手動標記",
       source,
       addedAt: new Date().toISOString(),
-      retrySelected: "",
-      retryChecked: false,
     };
   }
 
@@ -666,7 +690,7 @@
     if (!window.confirm(`確定重置「${chapter.title}」的做題記錄嗎？錯題本不會被清空。`)) return;
     chapter.questions.forEach((question) => {
       delete state.practice[question.id];
-      revealedAnswers.delete(question.id);
+      revealedAnswers.delete(getRevealKey("practice", question.id));
     });
     saveState();
     render();
@@ -687,6 +711,7 @@
   function clearWrongBook() {
     if (!window.confirm("確定清空錯題本嗎？這個操作不能撤回。")) return;
     state.wrongBook = {};
+    Object.keys(wrongDrafts).forEach((id) => delete wrongDrafts[id]);
     saveState();
     render();
     showToast("錯題本已清空。");
@@ -701,22 +726,22 @@
     }
     if (selected === question.answer) {
       delete state.wrongBook[questionId];
-      revealedAnswers.delete(questionId);
+      delete wrongDrafts[questionId];
+      revealedAnswers.delete(getRevealKey("wrong", questionId));
       saveState();
       render();
       showToast("這題答對了，已移出錯題本。");
       return;
     }
+    wrongDrafts[questionId] = selected;
     state.wrongBook[questionId] = {
       ...state.wrongBook[questionId],
       questionId,
       wrongAnswer: selected,
-      retrySelected: selected,
-      retryChecked: true,
       attempts: (state.wrongBook[questionId]?.attempts || 0) + 1,
       lastTriedAt: new Date().toISOString(),
     };
-    revealedAnswers.add(questionId);
+    revealedAnswers.add(getRevealKey("wrong", questionId));
     saveState();
     render();
     showToast("仍然答錯，這題會繼續留在錯題本。");
@@ -725,6 +750,8 @@
   function toggleWrong(questionId) {
     if (state.wrongBook[questionId]) {
       delete state.wrongBook[questionId];
+      delete wrongDrafts[questionId];
+      revealedAnswers.delete(getRevealKey("wrong", questionId));
       saveState();
       render();
       showToast("已移出錯題本。");
@@ -761,12 +788,14 @@
     if (action === "check-answer") checkPracticeAnswer(target.dataset.questionId);
     if (action === "check-wrong-answer") checkWrongAnswer(target.dataset.questionId);
     if (action === "reveal-answer") {
-      revealedAnswers.add(target.dataset.questionId);
+      revealedAnswers.add(getRevealKey(target.dataset.context, target.dataset.questionId));
       render();
     }
     if (action === "toggle-wrong") toggleWrong(target.dataset.questionId);
     if (action === "remove-wrong") {
       delete state.wrongBook[target.dataset.questionId];
+      delete wrongDrafts[target.dataset.questionId];
+      revealedAnswers.delete(getRevealKey("wrong", target.dataset.questionId));
       saveState();
       render();
       showToast("已移出錯題本。");
@@ -795,9 +824,8 @@
     if (input.dataset.context === "wrong") {
       const entry = state.wrongBook[input.dataset.questionId];
       if (entry) {
-        entry.retrySelected = input.value;
-        entry.retryChecked = false;
-        revealedAnswers.delete(input.dataset.questionId);
+        wrongDrafts[input.dataset.questionId] = input.value;
+        revealedAnswers.delete(getRevealKey("wrong", input.dataset.questionId));
         saveState();
         render();
       }
