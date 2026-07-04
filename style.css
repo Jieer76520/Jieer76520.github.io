@@ -597,7 +597,7 @@ button:disabled {
 .option-row:has(input:checked) {
   border-color: rgba(45, 127, 167, 0.28);
   background: #eef8fc;
-  box-shadow: none;
+  box-shadow: inset 4px 0 0 var(--clinical);
 }
 
 .option-row:active {

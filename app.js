@@ -744,12 +744,18 @@
       return;
     }
     if (selected === question.answer) {
-      delete state.wrongBook[questionId];
-      delete wrongDrafts[questionId];
-      revealedAnswers.delete(getRevealKey("wrong", questionId));
+      wrongDrafts[questionId] = selected;
+      state.wrongBook[questionId] = {
+        ...state.wrongBook[questionId],
+        questionId,
+        attempts: (state.wrongBook[questionId]?.attempts || 0) + 1,
+        lastTriedAt: new Date().toISOString(),
+        lastCorrectAt: new Date().toISOString(),
+      };
+      revealedAnswers.add(getRevealKey("wrong", questionId));
       saveState();
       render();
-      showToast("這題答對了，已移出錯題本。");
+      showToast("答對了，題目已保留在錯題本，可手動移出。");
       return;
     }
     wrongDrafts[questionId] = selected;
@@ -854,7 +860,6 @@
         wrongDrafts[input.dataset.questionId] = input.value;
         revealedAnswers.delete(getRevealKey("wrong", input.dataset.questionId));
         saveState();
-        render();
       }
       return;
     }
