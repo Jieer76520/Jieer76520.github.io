@@ -766,13 +766,21 @@
     showToast("仍然答錯，這題會繼續留在錯題本。");
   }
 
+  function updateWrongButtons(questionId, isWrongMarked) {
+    app.querySelectorAll('[data-action="toggle-wrong"]').forEach((button) => {
+      if (button.dataset.questionId !== questionId) return;
+      const isExamButton = Boolean(button.closest(".exam-list"));
+      button.textContent = isWrongMarked ? "移出錯題本" : isExamButton ? "標記錯題" : "加入錯題本";
+    });
+  }
+
   function toggleWrong(questionId) {
     if (state.wrongBook[questionId]) {
       delete state.wrongBook[questionId];
       delete wrongDrafts[questionId];
       revealedAnswers.delete(getRevealKey("wrong", questionId));
       saveState();
-      render();
+      updateWrongButtons(questionId, false);
       showToast("已移出錯題本。");
       return;
     }
@@ -783,7 +791,7 @@
       "手動標記";
     addWrong(questionId, selected, "手動標記");
     saveState();
-    render();
+    updateWrongButtons(questionId, true);
     showToast("已加入錯題本。");
   }
 

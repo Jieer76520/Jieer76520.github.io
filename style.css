@@ -573,38 +573,19 @@ button:disabled {
 .option-row {
   position: relative;
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: #fff;
   padding: 12px;
   line-height: 1.6;
   cursor: pointer;
-  overflow: hidden;
   transition:
-    transform 160ms var(--ease-out),
     border-color 180ms var(--ease-out),
     background 180ms var(--ease-out),
     box-shadow 220ms var(--ease-out),
     color 180ms var(--ease-out);
-  will-change: transform;
-}
-
-.option-row::after {
-  content: "";
-  position: absolute;
-  inset: 8px;
-  border-radius: calc(var(--radius) - 2px);
-  border: 1px solid transparent;
-  opacity: 0;
-  pointer-events: none;
-  transform: scale(0.985);
-  transition:
-    opacity 240ms var(--ease-out),
-    transform 180ms var(--ease-out),
-    border-color 180ms var(--ease-out);
 }
 
 .option-row:hover {
@@ -614,17 +595,9 @@ button:disabled {
 
 .option-row.selected,
 .option-row:has(input:checked) {
-  border-color: var(--clinical);
-  background: var(--clinical-soft);
-  box-shadow: 0 0 0 3px var(--focus);
-  transform: none;
-}
-
-.option-row.selected::after,
-.option-row:has(input:checked)::after {
-  border-color: rgba(47, 111, 149, 0.24);
-  opacity: 1;
-  transform: scale(1);
+  border-color: rgba(45, 127, 167, 0.28);
+  background: #eef8fc;
+  box-shadow: none;
 }
 
 .option-row:active {
@@ -632,8 +605,12 @@ button:disabled {
 }
 
 .option-row input {
-  accent-color: var(--clinical);
-  margin-top: 5px;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .option-row.correct,
@@ -644,26 +621,12 @@ button:disabled {
   color: #0f5138;
 }
 
-.option-row.correct::after,
-.option-row.selected.correct::after,
-.option-row:has(input:checked).correct::after {
-  border-color: rgba(22, 114, 79, 0.22);
-  opacity: 1;
-}
-
 .option-row.incorrect,
 .option-row.selected.incorrect,
 .option-row:has(input:checked).incorrect {
   border-color: #efb7bf;
   background: var(--danger-soft);
   color: #7f2733;
-}
-
-.option-row.incorrect::after,
-.option-row.selected.incorrect::after,
-.option-row:has(input:checked).incorrect::after {
-  border-color: rgba(190, 75, 90, 0.22);
-  opacity: 1;
 }
 
 .answer-box,
