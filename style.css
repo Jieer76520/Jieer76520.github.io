@@ -672,8 +672,21 @@ button:disabled {
   border-radius: var(--radius);
   padding: 12px;
   line-height: 1.7;
-  animation: softReveal 160ms var(--ease-out) both;
   transform-origin: top center;
+}
+
+.judgement-panel {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+.question-card .judgement-panel {
+  animation: judgementPanelIn 430ms var(--ease-out) both;
+}
+
+.judgement-content {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .feedback.ok {
@@ -844,13 +857,15 @@ details.panel summary {
   }
 }
 
-@keyframes softReveal {
+@keyframes judgementPanelIn {
   from {
     opacity: 0;
-    transform: translateY(-3px);
+    grid-template-rows: 0fr;
+    transform: translateY(3px);
   }
   to {
     opacity: 1;
+    grid-template-rows: 1fr;
     transform: translateY(0);
   }
 }

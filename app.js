@@ -297,8 +297,7 @@
             .join("")}
         </div>
         ${actions}
-        ${renderFeedback(q, { selected, showAnswer, isExam, submitted, practiceRecord, correct })}
-        ${showAnswer ? renderAnswerBox(q) : ""}
+        ${renderJudgementPanel(q, { selected, showAnswer, isExam, submitted, practiceRecord, correct })}
       </article>
     `;
   }
@@ -326,6 +325,20 @@
       return '<div class="feedback ok">回答正確。</div>';
     }
     return `<div class="feedback bad">回答錯誤。你的答案：${escapeHtml(formatAnswer(q, config.selected))}</div>`;
+  }
+
+  function renderJudgementPanel(q, config) {
+    const feedback = renderFeedback(q, config);
+    const answer = config.showAnswer ? renderAnswerBox(q) : "";
+    if (!feedback && !answer) return "";
+    return `
+      <div class="judgement-panel">
+        <div class="judgement-content">
+          ${feedback}
+          ${answer}
+        </div>
+      </div>
+    `;
   }
 
   function renderAnswerBox(q) {
